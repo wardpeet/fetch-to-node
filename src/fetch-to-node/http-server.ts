@@ -417,6 +417,7 @@ export class FetchServerResponse
     }
 
     const _this = this;
+    let cancelled = false;
     let body = this._hasBody
       ? new ReadableStream<Uint8Array>({
           start(controller) {
@@ -428,18 +429,30 @@ export class FetchServerResponse
               controller.close();
             } else {
               _this.on("finish", () => {
+                if (cancelled) return;
                 finished = true;
-                controller.close();
+                try {
+                  controller.close();
+                } catch () {
+                  // do nothing
+                }
               });
               _this.on("_dataWritten", (e: DataWrittenEvent) => {
-                if (finished) {
+                if (finished || cancelled) {
                   return;
                 }
                 const data = _this.dataFromDataWrittenEvent(e);
-                controller.enqueue(data);
+                try {
+                  controller.enqueue(data);
+                } catch () {
+                  // do nothing
+                }
               });
             }
           },
+          cancel() {
+            cancelled = true;
+          }
         })
       : null;
 
